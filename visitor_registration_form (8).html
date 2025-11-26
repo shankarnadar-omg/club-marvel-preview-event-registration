@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visitor Registration & Exit Feedback</title>
+
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; }
+    h2 { text-align: center; }
+    .hidden { display: none; }
+    label { font-weight: bold; }
+    input, select, textarea { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc; }
+    button { width: 100%; padding: 12px; background: #0066ff; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #004acc; }
+    .top-image { text-align: center; margin-bottom: 20px; }
+    .top-image img { max-width: 100%; height: auto; border-radius: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="entryPage">
+    <div class="top-image">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAscAAAHqCAYAAADoLONbAAAAAXNSR0IArs4c6QAA..."+"" alt="Company Logo" />
+    </div>
+
+    <h2>Visitor Registration</h2>
+
+    <label>Visitor Type</label>
+    <select id="visitorType" onchange="toggleVisitorFields()">
+      <option value="">Select</option>
+      <option value="resident">Resident</option>
+      <option value="nonresident">Non Resident</option>
+    </select>
+
+    <!-- Resident Fields -->
+    <div id="residentFields" class="hidden">
+      <label>Project</label>
+      <select id="project" onchange="populateTowers()">
+        <option value="">Select Project</option>
+        <option value="Alexa">Alexa</option>
+        <option value="Atria">Atria</option>
+        <option value="Aviva">Aviva</option>
+        <option value="Elara">Elara</option>
+        <option value="Estella">Estella</option>
+        <option value="Euphoria">Euphoria</option>
+        <option value="THE PALACE">THE PALACE</option>
+      </select>
+
+      <label>Tower</label>
+      <select id="tower"></select>
+
+      <label>Unit Number</label>
+      <input type="text" id="unitNumber" placeholder="Enter Unit Number" />
+    </div>
+
+    <!-- Non Resident Fields -->
+    <div id="nonResidentFields" class="hidden">
+      <label>Full Name</label>
+      <input type="text" id="name" placeholder="Enter Full Name" />
+
+      <label>Contact Number</label>
+      <input type="text" id="contact" placeholder="Enter Contact Number" />
+    </div>
+
+    <button id="entryBtn" onclick="submitToGoogle('entry')">Submit & Check-In</button>
+  </div>
+
+  <div class="container hidden" id="exitPage">
+    <div class="top-image">
+      <img src="YOUR_IMAGE_URL_HERE" alt="Company Logo" />
+    </div>
+
+    <h2>Exit Feedback</h2>
+
+    <label>Visit ID</label>
+    <input id="visitId" placeholder="Enter Visit ID" />
+
+    <label>Was your purpose served?</label>
+    <select id="served">
+      <option value="Yes">Yes</option>
+      <option value="No">No</option>
+    </select>
+
+    <label>Rate Your Experience</label>
+    <select id="rating">
+      <option>1</option>
+      <option>2</option>
+      <option>3</option>
+      <option>4</option>
+      <option>5</option>
+    </select>
+
+    <label>Feedback</label>
+    <textarea id="feedback" placeholder="Comments..."></textarea>
+
+    <button onclick="submitToGoogle('exit')">Submit Exit Feedback</button>
+  </div>
+
+<script>
+function toggleVisitorFields() {
+  const type = document.getElementById("visitorType").value;
+  document.getElementById("residentFields").classList.add("hidden");
+  document.getElementById("nonResidentFields").classList.add("hidden");
+
+  if (type === "resident") document.getElementById("residentFields").classList.remove("hidden");
+  if (type === "nonresident") document.getElementById("nonResidentFields").classList.remove("hidden");
+}
+
+const projectTowers = {
+  "Alexa": ["1A", "1B"],
+  "Atria": ["3A", "3B"],
+  "Aviva": ["A", "B", "C", "D"],
+  "Elara": ["4A", "4B", "4C", "4D"],
+  "Estella": ["2A", "2B", "2C", "2D"],
+  "Euphoria": ["-"],
+  "THE PALACE": ["A1", "A2", "B1", "B2", "C1", "C2"]
+};
+
+function populateTowers() {
+  const project = document.getElementById("project").value;
+  const towerSelect = document.getElementById("tower");
+  towerSelect.innerHTML = "";
+
+  if(projectTowers[project]) {
+    const sortedTowers = projectTowers[project].slice().sort();
+    sortedTowers.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.innerText = t;
+      towerSelect.appendChild(opt);
+    });
+  }
+}
+
+const SHEET_API = "https://script.google.com/a/macros/jpinfra.com/s/AKfycbyazOsTnPIatQ0alzmk_s19-6WzImmPnDM34mi1CxZb6pfrY0AVsXbaPGpOiPvPep9U/exec";
+
+function submitToGoogle(type) {
+  if (!SHEET_API) { alert("⚠️ Google Sheet Web App URL not set"); return; }
+
+  let payload = {};
+
+  if (type === 'entry') {
+     payload = collectEntry();
+     if (!payload) return;
+  }
+
+  if (type === 'exit') {
+     payload = collectExit();
+  }
+
+  fetch(SHEET_API, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify(payload)
+  });
+
+  alert("Submitted Successfully!");
+}
+
+function collectEntry() {
+  const type = document.getElementById("visitorType").value;
+  if (!type) { alert("Select visitor type"); return null; }
+
+  let data = { type: 'entry', visitorType: type, entryTime: new Date().toLocaleString() };
+  data.visitId = "VISIT-" + Date.now();
+
+  if (type === "resident") {
+    data.project = document.getElementById("project").value;
+    data.tower = document.getElementById("tower").value;
+    data.unitNumber = document.getElementById("unitNumber").value;
+  } else {
+    data.name = document.getElementById("name").value;
+    data.contact = document.getElementById("contact").value;
+  }
+
+  return data;
+}
+
+function collectExit() {
+  return {
+    type: 'exit',
+    visitId: document.getElementById("visitId").value,
+    served: document.getElementById("served").value,
+    rating: document.getElementById("rating").value,
+    feedback: document.getElementById("feedback").value,
+    exitTime: new Date().toLocaleString()
+  };
+}
+</script>
+</body>
+</html>
